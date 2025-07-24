@@ -196,3 +196,216 @@ export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/terraform-sa.json"
 gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
 ```
 ---
+
+## **Provisioning New GCP Environments with Terraform**
+
+To provision a new GCP environme nt that supports the Posit ecosystem (Workbench, Connect, Package Manager), use the Terraform project available at:
+
+[**kimbodo-posit-tf-gcp**](https://github.com/ValcirJRKimbodo/kimbodo-posit-tf-gcp)
+
+This repository contains reusable modules that came from [kimbodo-tf-multicloud-modules](https://github.com/nkopskimbodo/kimbodo-tf-multicloud-modules) and environment-specific configurations to create:
+
+- VPCs
+- Subnets
+- GKE clusters -
+- Node pools
+- Reserved static IPs for ingress
+
+---
+
+### **Repository Structure**
+
+```
+kimbodo-posit-tf-gcp/
+├── envs/
+    ├── dev-gcp/              # Dev environment (example)
+    |  ├─ main.tf
+    |  ├─ backend.tf
+    |  ├─ versions.tf
+    |  ├─ terraform.tfvars
+    └── [new-env]/            # Create new environment folders here
+```
+
+---
+
+### **Steps to Create a New Environment**
+
+#### 1. **Clone the Repository**
+
+```bash
+git clone https://github.com/ValcirJRKimbodo/kimbodo-posit-tf-gcp.git
+cd kimbodo-posit-tf-gcp/envs
+```
+
+#### 2. **Create a New Folder for Your Environment**
+
+```bash
+cp -r dev-gcp new-env-gcp
+cd new-env-gcp
+```
+
+Customize the `terraform.tfvars` file with values like:
+
+- `project_id` -> your GCP project name created before
+- `region` --> one that you choose to your project, default is us-central1
+- And others as needed
+
+#### 3. **Configure Credentials and Initialize Terraform**
+
+Export your GCP credentials, using the terraform created at the GCP project setup:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="./terraform-sa.json"
+```
+
+Initialize and apply on your environments folder:
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+This will provision all the required cloud infrastructure for your Posit applications.
+
+---
+
+### ✅ Final Checklist
+
+Run these after provisioning:
+
+```bash
+# Check GKE cluster
+gcloud container clusters list --project=$PROJECT_ID
+
+# Confirm IPs and DNS are created
+gcloud compute addresses list --project=$PROJECT_ID
+gcloud dns managed-zones list --project=$PROJECT_ID
+
+# Validate node pools
+gcloud container node-pools list --cluster=[CLUSTER_NAME] --project=$PROJECT_ID
+```
+
+---
+
+
+## **Deploying Posit with Helmfile on GKE**
+
+After the infrastructure (VPC, GKE, IPs, DNS) has been provisioned via Terraform, you can deploy the Posit stack (Workbench, Connect, and Package Manager) on the cluster using **Helmfile**.
+
+The configuration repository is:  
+[**kimbodo-posit-clusters-configs**](https://github.com/ValcirJRKimbodo/kimbodo-posit-clusters-configs).
+
+---
+
+### **1. Connecting to the GKE Cluster**
+
+Fetch the cluster credentials:
+
+```bash
+gcloud container clusters get-credentials [CLUSTER_NAME]   --region [REGION]   --project [PROJECT_ID]
+```
+
+Verify the connection:
+
+```bash
+kubectl get nodes
+```
+
+---
+
+### **2. Installing Local Dependencies**
+
+Ensure you have the following tools installed:
+
+- **kubectl** (version compatible with GKE cluster)
+- **Helm** (>= 3.14)
+- **Helmfile** (>= 0.160)
+
+On Linux or WSL:
+
+```bash
+curl -LO https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz
+tar -zxvf helm-v3.14.0-linux-amd64.tar.gz
+sudo mv linux-amd64/helm /usr/local/bin/
+
+# Install Helmfile
+curl -L https://github.com/helmfile/helmfile/releases/download/v0.160.0/helmfile_0.160.0_linux_amd64.tar.gz | tar xz
+sudo mv helmfile /usr/local/bin/
+```
+
+---
+
+### **3. Cloning the Configuration Repository**
+
+```bash
+git clone https://github.com/ValcirJRKimbodo/kimbodo-posit-clusters-configs.git
+cd kimbodo-posit-clusters-configs
+```
+
+---
+
+### **4. Adjusting `values`**
+
+Within the repository, the configuration values are located under `values-environments/`.
+
+- Each environment has its own files (e.g., `values-environments/mvp-gcp/global.yaml`).
+- Update domains, OAuth credentials, and other parameters as required.
+
+Domain adjustment example:
+
+```yaml
+global:
+  domain: posit01gcp.yourdomain.com
+```
+
+---
+
+### **5. Testing Helmfile Render**
+
+Before applying, check if the templates are valid:
+
+```bash
+helmfile -e mvp-gcp template
+```
+
+If everything looks correct, proceed with the deployment.
+
+---
+
+### **6. Deploying with Helmfile**
+
+To deploy all components:
+
+```bash
+helmfile -e mvp-gcp sync
+```
+
+The `-e mvp-gcp` flag specifies the environment. For a different environment, create a new `values-environments/[env]/global.yaml` file and reference it in the `helmfile.yaml`.
+
+---
+
+### **7. Verifying the Deployment**
+
+```bash
+kubectl get pods -A
+kubectl get ingress -A
+```
+
+Wait until all pods have `STATUS=Running` and ingresses have external IPs assigned.
+
+---
+
+### **8. Post-Deployment Checklist**
+
+```bash
+# Check issued TLS certificates
+kubectl get certificate -A
+
+# Check services
+kubectl get svc -A
+
+# Test URLs for Posit Workbench, Connect, and Package Manager
+```
+---
+## **Using GitHub Actions to deploy your applications**
