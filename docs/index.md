@@ -408,4 +408,22 @@ kubectl get svc -A
 # Test URLs for Posit Workbench, Connect, and Package Manager
 ```
 ---
+
 ## **Using GitHub Actions to deploy your applications**
+
+After setting up all these projects, you can use GitHub Actions to deploy them. Let’s take an overview of the repository architecture diagram.
+
+### Github Architecture Diagram Overview
+
+This diagram shows the DevOps architecture of the Kimbodo-Posit project, highlighting how infrastructure and apps are managed:
+
+![Github Architecture Diagram](./img/devops-archtecture.jpg)
+
+|Section|Description|
+|---|---|
+|Terraform (purple):| Repos like kimbodo-posit-tf-gcp, -aws, -azr deploy cloud resources (AWS, GCP, Azure) using shared tf-modules. Repos like kimbodo-posit-tf-gcp, -aws, -azr deploy cloud resources (AWS, GCP, Azure) using shared tf-modules.
+|Helm & Kubernetes (blue & green middle section):| kimbodo-posit-helm-base-resources and kimbodo-posit-clusters-configs define base cluster configs and Helm charts.|
+|Applications (bottom):| Charts for Posit tools (workbench-session, package-manager) and custom GitHub Actions (kimbodo-posit-actions).|
+|External Registries:| ArtifactHub (Helm charts) and Docker Hub (images).|
+
+It maps how code, infrastructure, and apps are versioned, deployed, and published in a multi-cloud environment.
